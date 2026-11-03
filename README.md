@@ -1,13 +1,13 @@
 # Life Board Skill · 人生看板
 
-可复用的 Codex Skill，附带完整 React + TypeScript + Vite 应用源码。用它生成同款人生看板，保留暖纸白与深林绿视觉，以及工作、知识、健康、财务、生活五板块。
+可复用的 AI Skill，附带完整 React + TypeScript + Vite 应用源码。用它生成同款人生看板，保留暖纸白与深林绿视觉，以及工作、知识、健康、财务、生活五板块。
 
 ## 安装与调用
 
-将本仓库克隆到个人技能目录中尚不存在的 `life-board` 目录：
+将本仓库克隆到所用工具的技能目录中尚不存在的 `life-board` 目录（将下方路径替换为实际技能目录）：
 
 ```bash
-git clone https://github.com/alanxuyiyao-hash/life-board-skill.git ~/.codex/skills/life-board
+git clone https://github.com/alanxuyiyao-hash/life-board-skill.git /path/to/skills/life-board
 ```
 
 已有同名技能时先保留已有版本，不要直接覆盖。重新打开会话后调用：
