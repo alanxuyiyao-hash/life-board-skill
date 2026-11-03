@@ -1,0 +1,1333 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#fbf9f5" />
+    <title>Life Board · 人生看板</title>
+    <style>
+      /* ============ 设计 Token（字面值取自 Life Board styles.css :root）============ */
+      :root {
+        --el-bg: #fbf9f5;          /* 暖白纸底 */
+        --el-card: #ffffff;
+        --el-ink: #1b1c1a;
+        --el-muted: #8a887f;       /* 鼠尾草灰 */
+        --el-mut2: #b5b2a8;
+        --el-mut-strong: #605e57;
+        --el-line: #ece9e1;
+        --el-soft: #e6e2d9;        /* 米色：侧栏/胶囊底 */
+        --el-lime: #bceecd;        /* 浅薄荷 */
+        --el-lime-deep: #14422b;   /* 深林绿：主操作/选中 */
+        --el-green: #2d5a41;
+        --el-green-bg: #e2efe6;
+        --el-amber: #b5791a;
+        --el-amber-ink: #8f5e10;
+        --el-amber-bg: #f6ebd2;
+        --el-rose: #ba1a1a;
+        --el-rose-bg: #ffdad6;
+        --el-pub: #1d4d33;
+        --el-pub-bg: #c6ecd4;
+        --el-sh: 0 1px 2px rgba(20, 20, 19, 0.05), 0 4px 10px -4px rgba(20, 20, 19, 0.08);
+
+        --nc-r: 12px;
+        --nc-r-sm: 8px;
+        --nc-r-xs: 6px;
+        --nc-border: color-mix(in srgb, #14422b 10%, #fbf9f5);
+        --nc-border-subtle: color-mix(in srgb, #14422b 6%, #fbf9f5);
+        --nc-border-strong: color-mix(in srgb, #14422b 18%, #fbf9f5);
+        --nc-shadow-pop: 0 8px 24px -8px rgba(20, 20, 19, 0.18), 0 0 0 1px var(--nc-border);
+        --nc-shadow-modal: 0 24px 64px -16px rgba(20, 20, 19, 0.28), 0 0 0 1px var(--nc-border);
+
+        /* 5 板块色（取自 seed.ts AREA_SEEDS） */
+        --c-work: #b5791a;
+        --c-knowledge: #5a6ea0;
+        --c-health: #2c7a4e;
+        --c-finance: #14422b;
+        --c-life: #c0564d;
+
+        --topbar-h: 60px;
+        --sidebar-w: 240px;
+        --sidebar-w-collapsed: 64px;
+
+        --font-disp: 'Noto Sans SC', 'Hanken Grotesk', 'Clash Display', -apple-system,
+          'SF Pro Display', system-ui, 'PingFang SC', 'HarmonyOS Sans SC', sans-serif;
+        --font-body: 'Noto Sans SC', 'Hanken Grotesk', 'General Sans', -apple-system,
+          'SF Pro Text', system-ui, 'PingFang SC', sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; height: 100%; }
+      body {
+        font-family: var(--font-body);
+        background: var(--el-bg);
+        color: var(--el-ink);
+        font-size: 14px;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+        min-width: 1080px;
+      }
+      button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+      input, select, textarea { font-family: inherit; font-size: 14px; color: inherit; }
+      ::-webkit-scrollbar { width: 10px; height: 10px; }
+      ::-webkit-scrollbar-thumb { background: var(--el-line); border-radius: 8px; border: 2px solid var(--el-bg); }
+      ::-webkit-scrollbar-thumb:hover { background: var(--el-mut2); }
+
+      /* ============ 图标 ============ */
+      .icon { width: 20px; height: 20px; stroke: currentColor; stroke-width: 1.8;
+        fill: none; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+      .icon-sm { width: 16px; height: 16px; }
+      .icon-lg { width: 22px; height: 22px; }
+
+      /* ============ App Shell ============ */
+      .app {
+        display: grid;
+        grid-template-columns: var(--sidebar-w) 1fr;
+        height: 100vh;
+        overflow: hidden;
+      }
+      .app.ref-sidebar-collapsed { grid-template-columns: var(--sidebar-w-collapsed) 1fr; }
+
+      /* ---------- 侧栏 ---------- */
+      .tabbar {
+        background: var(--el-soft);
+        border-right: 1px solid var(--el-line);
+        display: flex;
+        flex-direction: column;
+        padding: 14px 12px 12px;
+        gap: 4px;
+        overflow-y: auto;
+        transition: grid-column 0.18s ease;
+      }
+      .side-brand {
+        display: flex; align-items: center; gap: 10px;
+        padding: 6px 8px 14px;
+      }
+      .side-logo {
+        width: 30px; height: 30px; border-radius: 8px; flex: none;
+        background: var(--el-lime-deep);
+        display: grid; place-items: center; color: #fff;
+        font-family: var(--font-disp); font-weight: 700; font-size: 15px;
+      }
+      .side-brand-tw { display: flex; flex-direction: column; line-height: 1.15; }
+      .side-brand-t { font-family: var(--font-disp); font-weight: 600; font-size: 15px; letter-spacing: 0.1px; }
+      .side-brand-sub { font-size: 11px; color: var(--el-mut-strong); }
+      .ref-sidebar-toggle {
+        margin-left: auto; width: 26px; height: 26px; border-radius: 7px;
+        display: grid; place-items: center; color: var(--el-mut-strong);
+      }
+      .ref-sidebar-toggle:hover { background: color-mix(in srgb, #14422b 8%, transparent); }
+
+      .ref-sidebar-search {
+        display: flex; align-items: center; gap: 10px;
+        padding: 8px 10px; border-radius: var(--nc-r-sm);
+        background: var(--el-bg); border: 1px solid var(--nc-border);
+        color: var(--el-mut-strong); font-size: 13px;
+      }
+      .ref-sidebar-search:hover { border-color: var(--nc-border-strong); }
+      .ref-sidebar-label { flex: 1; text-align: left; }
+      .ref-sidebar-search kbd { font-size: 10.5px; color: var(--el-muted);
+        background: var(--el-soft); padding: 1px 5px; border-radius: 4px; font-family: var(--font-body); }
+
+      .side-sep {
+        font-size: 11px; color: var(--el-muted); letter-spacing: 0.8px;
+        padding: 14px 10px 4px; text-transform: uppercase;
+      }
+      .tab {
+        display: flex; align-items: center; gap: 12px;
+        padding: 8px 10px; border-radius: var(--nc-r-sm);
+        color: var(--el-mut-strong); font-size: 14px; font-weight: 500;
+        width: 100%; text-align: left; position: relative;
+      }
+      .tab:hover { background: color-mix(in srgb, #14422b 6%, transparent); color: var(--el-ink); }
+      .tab.active { background: var(--el-bg); color: var(--el-lime-deep); box-shadow: var(--el-sh); }
+      .tab.active::before {
+        content: ''; position: absolute; left: -12px; top: 8px; bottom: 8px; width: 3px;
+        background: var(--el-lime-deep); border-radius: 0 3px 3px 0;
+      }
+      .tab .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+      .tab .tab-label { flex: 1; }
+
+      .side-foot { margin-top: auto; display: flex; flex-direction: column; gap: 6px; padding-top: 10px; }
+      .side-cta {
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        padding: 10px 12px; border-radius: var(--nc-r-sm);
+        background: var(--el-lime-deep); color: #fff; font-weight: 600; font-size: 14px;
+        box-shadow: var(--el-sh);
+      }
+      .side-cta:hover { background: #0f3523; }
+      .side-cta kbd { font-size: 10.5px; opacity: 0.7; font-family: var(--font-body); }
+      .side-profile {
+        display: flex; align-items: center; gap: 10px;
+        padding: 8px 10px; border-radius: var(--nc-r-sm); width: 100%;
+      }
+      .side-profile:hover { background: color-mix(in srgb, #14422b 6%, transparent); }
+      .avatar {
+        width: 28px; height: 28px; border-radius: 50%; flex: none;
+        background: linear-gradient(135deg, var(--el-amber), var(--c-life));
+        color: #fff; display: grid; place-items: center; font-weight: 600; font-size: 12px;
+      }
+      .side-profile .pname { font-size: 13px; font-weight: 500; }
+
+      /* 折叠态 */
+      .ref-sidebar-collapsed .side-brand-tw,
+      .ref-sidebar-collapsed .ref-sidebar-label,
+      .ref-sidebar-collapsed .tab-label,
+      .ref-sidebar-collapsed .side-sep,
+      .ref-sidebar-collapsed .side-cta span:not(.icon),
+      .ref-sidebar-collapsed .side-cta kbd,
+      .ref-sidebar-collapsed .ref-sidebar-search kbd,
+      .ref-sidebar-collapsed .side-profile .pname,
+      .ref-sidebar-collapsed .tab .dot { display: none; }
+      .ref-sidebar-collapsed .tab,
+      .ref-sidebar-collapsed .ref-sidebar-search,
+      .ref-sidebar-collapsed .side-profile { justify-content: center; padding: 10px; }
+      .ref-sidebar-collapsed .side-brand { justify-content: center; padding: 6px 0 14px; }
+      .ref-sidebar-collapsed .side-cta { padding: 10px; }
+
+      /* ---------- 主区 ---------- */
+      .content { display: flex; flex-direction: column; overflow: hidden; }
+      .topbar {
+        height: var(--topbar-h); flex: none;
+        display: flex; align-items: center; gap: 16px;
+        padding: 0 28px;
+        border-bottom: 1px solid var(--el-line);
+        background: color-mix(in srgb, var(--el-bg) 88%, transparent);
+        backdrop-filter: blur(8px);
+      }
+      .topbar-search {
+        display: flex; align-items: center; gap: 10px;
+        width: 360px; padding: 8px 12px; border-radius: var(--nc-r-sm);
+        background: var(--el-card); border: 1px solid var(--nc-border);
+        color: var(--el-muted); font-size: 13px;
+      }
+      .topbar-search:hover { border-color: var(--nc-border-strong); }
+      .topbar-search-ph { flex: 1; text-align: left; }
+      .topbar-search kbd { font-size: 10.5px; color: var(--el-muted);
+        background: var(--el-soft); padding: 1px 6px; border-radius: 4px; font-family: var(--font-body); }
+      .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+      .topbar-avatar { display: flex; align-items: center; gap: 8px; padding: 4px 8px 4px 4px; border-radius: var(--nc-r-sm); }
+      .topbar-avatar:hover { background: var(--el-soft); }
+
+      .tab-panel { display: none; flex: 1; overflow-y: auto; overflow-x: hidden; }
+      .tab-panel.active { display: block; }
+      .panel-inner { max-width: 1080px; margin: 0 auto; padding: 28px 28px 120px; }
+
+      /* ---------- 通用组件 ---------- */
+      .page-head { margin-bottom: 22px; }
+      .page-eyebrow { font-size: 12px; color: var(--el-muted); letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 4px; }
+      .page-title { font-family: var(--font-disp); font-size: 26px; font-weight: 600; letter-spacing: -0.2px; margin: 0; }
+      .page-sub { color: var(--el-mut-strong); font-size: 14px; margin-top: 4px; }
+
+      .card {
+        background: var(--el-card); border: 1px solid var(--nc-border);
+        border-radius: var(--nc-r); padding: 18px; box-shadow: var(--el-sh);
+      }
+      .card + .card { margin-top: 14px; }
+      .section-title { font-family: var(--font-disp); font-size: 15.5px; font-weight: 600; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+      .section-title .sec-sub { font-family: var(--font-body); font-weight: 400; font-size: 12.5px; color: var(--el-muted); }
+      .grid { display: grid; gap: 14px; }
+      .grid-2 { grid-template-columns: 1fr 1fr; }
+      .grid-3 { grid-template-columns: repeat(3, 1fr); }
+      .grid-5 { grid-template-columns: repeat(5, 1fr); }
+      .stack { display: flex; flex-direction: column; gap: 14px; }
+      .row { display: flex; align-items: center; gap: 10px; }
+
+      .seg {
+        display: inline-flex; background: var(--el-soft); border-radius: var(--nc-r-sm);
+        padding: 3px; gap: 2px; flex-wrap: wrap;
+      }
+      .seg button {
+        padding: 6px 12px; border-radius: 6px; font-size: 13px; color: var(--el-mut-strong); font-weight: 500;
+        white-space: nowrap;
+      }
+      .seg button.active { background: var(--el-card); color: var(--el-ink); box-shadow: var(--el-sh); }
+
+      .badge {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 2px 9px; border-radius: var(--r-badge, 999px);
+        font-size: 11.5px; font-weight: 500; line-height: 1.7;
+      }
+      .badge .b-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+      .b-planned { color: var(--el-mut-strong); background: var(--el-soft); }
+      .b-producing { color: var(--el-amber-ink); background: var(--el-amber-bg); }
+      .b-published { color: var(--el-pub); background: var(--el-pub-bg); }
+      .b-ontrack { color: var(--el-mut-strong); background: var(--el-soft); }
+      .b-ahead { color: var(--el-green); background: var(--el-green-bg); }
+      .b-behind { color: var(--el-amber-ink); background: var(--el-amber-bg); }
+
+      .btn {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 8px 14px; border-radius: var(--nc-r-sm); font-size: 13px; font-weight: 500;
+        border: 1px solid var(--nc-border); background: var(--el-card); color: var(--el-ink);
+      }
+      .btn:hover { border-color: var(--nc-border-strong); }
+      .btn-primary { background: var(--el-lime-deep); color: #fff; border-color: transparent; }
+      .btn-primary:hover { background: #0f3523; }
+      .btn-ghost { background: transparent; border-color: transparent; color: var(--el-mut-strong); }
+      .btn-ghost:hover { background: var(--el-soft); }
+
+      /* 进度条（还原 .gl-row/.gl-track/.gl-fill/.gl-now） */
+      .gl-row { margin: 8px 0 4px; }
+      .gl-track {
+        position: relative; height: 8px; border-radius: 999px;
+        background: var(--el-soft); overflow: visible;
+      }
+      .gl-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: var(--el-lime-deep); }
+      .gl-now {
+        position: absolute; top: -3px; bottom: -3px; width: 2px; border-radius: 2px;
+        background: var(--el-amber); box-shadow: 0 0 0 2px rgba(181,121,26,0.16);
+      }
+      .gl-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--el-mut-strong); margin-top: 6px; }
+      .gl-meta .now-label { color: var(--el-amber-ink); font-weight: 500; }
+
+      /* 时间线 */
+      .timeline { display: flex; flex-direction: column; }
+      .tl-item {
+        display: flex; gap: 12px; padding: 11px 0;
+        border-top: 1px solid var(--nc-border-subtle);
+      }
+      .tl-item:first-child { border-top: none; }
+      .tl-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; flex: none; }
+      .tl-body { flex: 1; min-width: 0; }
+      .tl-title { font-size: 14px; font-weight: 500; }
+      .tl-sub { font-size: 12.5px; color: var(--el-muted); margin-top: 1px; }
+      .tl-meta { font-size: 11.5px; color: var(--el-mut2); margin-top: 3px; }
+
+      /* 列表行 */
+      .li-row {
+        display: flex; align-items: center; gap: 10px; padding: 9px 0;
+        border-top: 1px solid var(--nc-border-subtle);
+      }
+      .li-row:first-child { border-top: none; }
+      .li-title { font-size: 14px; flex: 1; }
+      .chk {
+        width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--el-mut2);
+        flex: none; display: grid; place-items: center; color: transparent;
+      }
+      .li-row.done .chk { background: var(--el-lime-deep); border-color: var(--el-lime-deep); color: #fff; }
+      .li-row.done .li-title { color: var(--el-muted); text-decoration: line-through; }
+
+      /* 板块入口格 */
+      .area-tile {
+        border: 1px solid var(--nc-border); border-radius: var(--nc-r);
+        padding: 16px; background: var(--el-card); box-shadow: var(--el-sh);
+        display: flex; flex-direction: column; gap: 8px; text-align: left; position: relative;
+        overflow: hidden;
+      }
+      .area-tile::before {
+        content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--ac, var(--el-lime-deep));
+      }
+      .area-tile:hover { border-color: var(--nc-border-strong); transform: translateY(-1px); }
+      .area-tile .at-icon {
+        width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
+        background: color-mix(in srgb, var(--ac) 14%, var(--el-card)); color: var(--ac);
+      }
+      .area-tile .at-name { font-family: var(--font-disp); font-weight: 600; font-size: 15px; }
+      .area-tile .at-sub { font-size: 12.5px; color: var(--el-muted); }
+
+      /* KPI */
+      .kpi { display: flex; flex-direction: column; gap: 4px; }
+      .kpi-label { font-size: 12px; color: var(--el-muted); }
+      .kpi-val { font-family: var(--font-disp); font-size: 24px; font-weight: 600; letter-spacing: -0.3px; }
+      .kpi-val.up { color: var(--el-green); }
+      .kpi-val.down { color: var(--el-amber-ink); }
+
+      /* mini 趋势线 */
+      .spark { width: 100%; height: 40px; }
+
+      /* 金额隐藏 */
+      .money { display: inline-block; position: relative; }
+      body.hide-money .money__val { display: none; }
+      body.hide-money .money::after { content: '••••'; color: var(--el-mut2); letter-spacing: 2px; }
+
+      /* 日历 */
+      .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+      .cal-dow { font-size: 11.5px; color: var(--el-muted); text-align: center; padding: 4px 0; font-weight: 500; }
+      .cal-cell {
+        aspect-ratio: 1; border-radius: 8px; border: 1px solid transparent;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 3px; font-size: 13px; position: relative;
+      }
+      .cal-cell.dim { color: var(--el-mut2); }
+      .cal-cell.today { background: var(--el-lime-deep); color: #fff; font-weight: 600; }
+      .cal-cell:hover:not(.today) { background: var(--el-soft); }
+      .cal-dots { display: flex; gap: 2px; position: absolute; bottom: 5px; }
+      .cal-dots span { width: 4px; height: 4px; border-radius: 50%; }
+
+      /* 开关 */
+      .switch { position: relative; width: 38px; height: 22px; flex: none; }
+      .switch input { opacity: 0; width: 0; height: 0; }
+      .switch .track {
+        position: absolute; inset: 0; border-radius: 999px; background: var(--el-mut2); transition: 0.18s;
+      }
+      .switch .thumb {
+        position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%;
+        background: #fff; box-shadow: var(--el-sh); transition: 0.18s;
+      }
+      .switch input:checked + .track { background: var(--el-lime-deep); }
+      .switch input:checked + .track + .thumb { transform: translateX(16px); }
+
+      .setting-row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-top: 1px solid var(--nc-border-subtle); }
+      .setting-row:first-child { border-top: none; }
+      .setting-row .sr-text { flex: 1; }
+      .setting-row .sr-title { font-size: 14px; font-weight: 500; }
+      .setting-row .sr-sub { font-size: 12.5px; color: var(--el-muted); margin-top: 1px; }
+
+      .danger-zone { border: 1px solid var(--el-rose); border-radius: var(--nc-r); padding: 16px; background: var(--el-rose-bg); }
+      .danger-zone .dz-title { color: var(--el-rose); font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+      .danger-zone .dz-sub { font-size: 12.5px; color: var(--el-rose-ink); margin-bottom: 10px; }
+
+      /* FAB */
+      .fab {
+        position: fixed; right: 28px; bottom: 28px;
+        width: 52px; height: 52px; border-radius: 50%;
+        background: var(--el-lime-deep); color: #fff;
+        display: grid; place-items: center;
+        box-shadow: 0 8px 24px -6px rgba(20, 66, 43, 0.4);
+        z-index: 40; transition: transform 0.15s;
+      }
+      .fab:hover { transform: scale(1.06); }
+      .fab .icon { width: 24px; height: 24px; stroke-width: 2.2; }
+      .fab.hidden { display: none; }
+
+      /* ============ 浮层 ============ */
+      .overlay {
+        position: fixed; inset: 0; z-index: 60;
+        background: rgba(28, 27, 24, 0.32); backdrop-filter: blur(3px);
+        display: none; align-items: flex-start; justify-content: center;
+        padding: 11vh 20px 20px;
+      }
+      .overlay.open { display: flex; }
+      .sheet {
+        background: var(--el-card); border-radius: var(--nc-r);
+        box-shadow: var(--nc-shadow-modal); width: 100%; max-width: 560px;
+        overflow: hidden;
+      }
+      .sheet-head { padding: 18px 20px 12px; border-bottom: 1px solid var(--el-line); display: flex; align-items: center; }
+      .sheet-head h3 { margin: 0; font-family: var(--font-disp); font-size: 17px; font-weight: 600; }
+      .sheet-head .x { margin-left: auto; width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; color: var(--el-mut-strong); }
+      .sheet-head .x:hover { background: var(--el-soft); }
+      .sheet-body { padding: 18px 20px; max-height: 62vh; overflow-y: auto; }
+      .sheet-foot { padding: 14px 20px; border-top: 1px solid var(--el-line); display: flex; justify-content: flex-end; gap: 8px; background: var(--el-bg); }
+
+      .rec-types { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+      .rec-type {
+        padding: 12px 8px; border-radius: var(--nc-r-sm); border: 1px solid var(--nc-border);
+        background: var(--el-card); text-align: center; font-size: 12.5px; color: var(--el-mut-strong);
+        display: flex; flex-direction: column; align-items: center; gap: 6px;
+      }
+      .rec-type .rt-icon { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--el-soft); color: var(--el-mut-strong); }
+      .rec-type.active { border-color: var(--el-lime-deep); background: var(--el-green-bg); color: var(--el-lime-deep); }
+      .rec-type.active .rt-icon { background: var(--el-lime-deep); color: #fff; }
+
+      .field { margin-bottom: 14px; }
+      .field label { display: block; font-size: 12px; color: var(--el-muted); margin-bottom: 5px; font-weight: 500; }
+      .field input[type=text], .field input[type=number], .field input[type=date], .field textarea, .field select {
+        width: 100%; padding: 10px 12px; border-radius: var(--nc-r-sm);
+        border: 1px solid var(--nc-border); background: var(--el-card); font-size: 14px;
+      }
+      .field input:focus, .field textarea:focus, .field select:focus {
+        outline: none; border-color: var(--el-lime-deep);
+        box-shadow: 0 0 0 3px rgba(20, 66, 43, 0.1);
+      }
+      .field textarea { min-height: 90px; resize: vertical; line-height: 1.6; }
+      .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+      .search-input {
+        width: 100%; padding: 14px 16px; font-size: 16px; border: none; background: transparent;
+      }
+      .search-input:focus { outline: none; }
+      .search-group-title { font-size: 11.5px; color: var(--el-muted); letter-spacing: 0.5px; text-transform: uppercase; padding: 12px 20px 4px; }
+      .search-item { display: flex; align-items: center; gap: 12px; padding: 9px 20px; cursor: pointer; }
+      .search-item:hover { background: var(--el-soft); }
+      .search-item .si-title { font-size: 14px; }
+      .search-item .si-sub { font-size: 12px; color: var(--el-muted); }
+
+      /* Toast */
+      .toast-host { position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 80; pointer-events: none; }
+      .toast {
+        background: var(--el-ink); color: #fff; padding: 10px 18px; border-radius: var(--nc-r-sm);
+        font-size: 13px; box-shadow: var(--nc-shadow-pop); opacity: 0;
+        transform: translateY(-8px); transition: 0.2s;
+      }
+      .toast.show { opacity: 1; transform: translateY(0); }
+
+      .hint-bar {
+        font-size: 12px; color: var(--el-muted); margin-top: 18px;
+        display: flex; gap: 16px; flex-wrap: wrap;
+      }
+      .hint-bar kbd { font-family: var(--font-body); background: var(--el-soft); padding: 1px 6px; border-radius: 4px; font-size: 11px; color: var(--el-mut-strong); }
+    </style>
+  </head>
+  <body>
+    <!-- ============ SVG 图标 sprite（从 App.tsx TABS 照搬路径）============ -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <defs>
+        <symbol id="i-overview" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="14" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" />
+        </symbol>
+        <symbol id="i-calendar" viewBox="0 0 24 24">
+          <path d="M8 2v3M16 2v3" /><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" />
+        </symbol>
+        <symbol id="i-work" viewBox="0 0 24 24">
+          <path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /><rect width="20" height="14" x="2" y="6" rx="2" />
+        </symbol>
+        <symbol id="i-knowledge" viewBox="0 0 24 24">
+          <path d="M12 7v14" />
+          <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
+        </symbol>
+        <symbol id="i-health" viewBox="0 0 24 24">
+          <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" />
+        </symbol>
+        <symbol id="i-finance" viewBox="0 0 24 24">
+          <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
+          <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
+        </symbol>
+        <symbol id="i-life" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10" />
+          <path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" />
+        </symbol>
+        <symbol id="i-settings" viewBox="0 0 24 24">
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+          <circle cx="12" cy="12" r="3" />
+        </symbol>
+        <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></symbol>
+        <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /></symbol>
+        <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></symbol>
+        <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></symbol>
+        <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></symbol>
+        <symbol id="i-graduation" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></symbol>
+      </defs>
+    </svg>
+
+    <!-- ============ App ============ -->
+    <div class="app" id="app">
+      <!-- 主区 -->
+      <main class="content">
+        <header class="topbar">
+          <button class="topbar-search" id="topbarSearchBtn">
+            <svg class="icon icon-sm"><use href="#i-search" /></svg>
+            <span class="topbar-search-ph">搜索全部内容…</span>
+            <kbd>⌘K</kbd>
+          </button>
+          <div class="topbar-actions">
+            <button class="topbar-avatar" onclick="switchTab('settings')">
+              <span class="avatar">A</span>
+              <span style="font-size:13px;font-weight:500">Alan</span>
+            </button>
+          </div>
+        </header>
+
+        <!-- ========== 总览 ========== -->
+        <section class="tab-panel active" data-panel="overview">
+          <div class="panel-inner">
+            <div class="page-head">
+              <div class="page-eyebrow">2026 年 8 月 11 日 · 周二</div>
+              <h1 class="page-title">下午好，Alan</h1>
+              <div class="page-sub">3 个年度目标在轨，健康板块 4 天没动静了——要不要去散个步？</div>
+            </div>
+
+            <!-- 年度目标 -->
+            <div class="card" style="margin-bottom:14px">
+              <div class="section-title">年度目标 · 2026<span class="sec-sub">进度由日常记录自动计算</span></div>
+
+              <!-- 目标 1：读书 -->
+              <div style="padding:12px 0;border-top:1px solid var(--nc-border-subtle)">
+                <div class="row" style="margin-bottom:2px">
+                  <span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--c-knowledge)"></span>
+                  <span style="font-weight:500">今年读 24 本书</span>
+                  <span class="badge b-ontrack"><span class="b-dot"></span>在轨</span>
+                  <span style="margin-left:auto;font-size:12.5px;color:var(--el-muted)">本月 1 / 2</span>
+                </div>
+                <div class="gl-row">
+                  <div class="gl-track">
+                    <div class="gl-fill" style="width:58%"></div>
+                    <div class="gl-now" style="left:61%" title="今天该到这"></div>
+                  </div>
+                  <div class="gl-meta">
+                    <span>14 / 24 本</span>
+                    <span class="now-label">今天该到 15 本</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 目标 2：跑步 -->
+              <div style="padding:12px 0;border-top:1px solid var(--nc-border-subtle)">
+                <div class="row" style="margin-bottom:2px">
+                  <span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--c-health)"></span>
+                  <span style="font-weight:500">今年跑 500 公里</span>
+                  <span class="badge b-ahead"><span class="b-dot"></span>领先</span>
+                  <span style="margin-left:auto;font-size:12.5px;color:var(--el-muted)">本周 6.5 / 10 km</span>
+                </div>
+                <div class="gl-row">
+                  <div class="gl-track">
+                    <div class="gl-fill" style="width:68%"></div>
+                    <div class="gl-now" style="left:61%"></div>
+                  </div>
+                  <div class="gl-meta">
+                    <span>340 / 500 km</span>
+                    <span class="now-label">今天该到 305 km</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 目标 3：体重 -->
+              <div style="padding:12px 0;border-top:1px solid var(--nc-border-subtle)">
+                <div class="row" style="margin-bottom:2px">
+                  <span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--c-health)"></span>
+                  <span style="font-weight:500">体重减到 68 kg</span>
+                  <span class="badge b-ahead"><span class="b-dot"></span>领先</span>
+                  <span style="margin-left:auto;font-size:12.5px;color:var(--el-muted)">最新读数 8/9</span>
+                </div>
+                <div class="gl-row">
+                  <div class="gl-track">
+                    <div class="gl-fill" style="width:76%"></div>
+                    <div class="gl-now" style="left:61%"></div>
+                  </div>
+                  <div class="gl-meta">
+                    <span>69.2 / 68 kg（起点 73）</span>
+                    <span class="now-label">今天该到 69.8</span>
+                  </div>
+                </div>
+              </div>
+              <div class="hint-bar">
+                <span><kbd>⌘N</kbd> 记一笔</span>
+                <span>琥珀色竖线 = 今天按时间该到的位置</span>
+              </div>
+            </div>
+
+            <!-- 最近动静 + 板块入口 -->
+            <div class="grid grid-2" style="align-items:start">
+              <div class="card">
+                <div class="section-title">最近动静</div>
+                <div class="timeline">
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-health)"></span>
+                    <div class="tl-body"><div class="tl-title">跑步 5.2 km</div><div class="tl-sub">运动 · 38 分钟</div><div class="tl-meta">今天 · 07:12</div></div></div>
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-work)"></span>
+                    <div class="tl-body"><div class="tl-title">商单 · 某品牌秋季推广确认</div><div class="tl-sub">报价 ¥8,800，已收 50% 定金</div><div class="tl-meta">今天 · 10:30</div></div></div>
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-knowledge)"></span>
+                    <div class="tl-body"><div class="tl-title">读《思考，快与慢》28 页</div><div class="tl-sub">第 2 部 · 锚定效应</div><div class="tl-meta">昨天 · 22:40</div></div></div>
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-finance)"></span>
+                    <div class="tl-body"><div class="tl-title">支出 · 超市采购 <span class="money"><span class="money__val">¥186</span></span></div><div class="tl-sub">现金流 · 日用</div><div class="tl-meta">昨天 · 19:05</div></div></div>
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-life)"></span>
+                    <div class="tl-body"><div class="tl-title">和小林吃晚饭</div><div class="tl-sub">人际 · 重要的人</div><div class="tl-meta">前天 · 20:00</div></div></div>
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-health)"></span>
+                    <div class="tl-body"><div class="tl-title">体重读数 69.2 kg</div><div class="tl-sub">身体指标 · 比上周 -0.4</div><div class="tl-meta">8/9 · 07:00</div></div></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="section-title">五板块</div>
+                <div class="grid grid-2" style="gap:12px">
+                  <button class="area-tile" style="--ac:var(--c-work)" onclick="switchTab('work')">
+                    <span class="at-icon"><svg class="icon"><use href="#i-work" /></svg></span>
+                    <span class="at-name">工作</span><span class="at-sub">2 个进行中商单</span></button>
+                  <button class="area-tile" style="--ac:var(--c-knowledge)" onclick="switchTab('knowledge')">
+                    <span class="at-icon"><svg class="icon"><use href="#i-knowledge" /></svg></span>
+                    <span class="at-name">知识</span><span class="at-sub">在读 2 本 · 1 课程</span></button>
+                  <button class="area-tile" style="--ac:var(--c-health)" onclick="switchTab('health')">
+                    <span class="at-icon"><svg class="icon"><use href="#i-health" /></svg></span>
+                    <span class="at-name">健康</span><span class="at-sub">本周 6.5 / 10 km</span></button>
+                  <button class="area-tile" style="--ac:var(--c-finance)" onclick="switchTab('finance')">
+                    <span class="at-icon"><svg class="icon"><use href="#i-finance" /></svg></span>
+                    <span class="at-name">财务</span><span class="at-sub">本月结余 <span class="money"><span class="money__val">¥9,360</span></span></span></button>
+                  <button class="area-tile" style="--ac:var(--c-life);grid-column:span 2" onclick="switchTab('life')">
+                    <span class="at-icon"><svg class="icon"><use href="#i-life" /></svg></span>
+                    <span class="at-name">生活</span><span class="at-sub">周末计划：莫干山两天一夜</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========== 日历 ========== -->
+        <section class="tab-panel" data-panel="calendar">
+          <div class="panel-inner">
+            <div class="page-head">
+              <div class="page-eyebrow">时间视图</div>
+              <h1 class="page-title">日历</h1>
+            </div>
+            <div class="grid grid-2" style="align-items:start">
+              <div class="card">
+                <div class="row" style="margin-bottom:14px">
+                  <button class="btn-ghost btn" style="padding:6px"><svg class="icon icon-sm"><use href="#i-chevron-left"/></svg></button>
+                  <span style="font-family:var(--font-disp);font-weight:600;font-size:17px;flex:1;text-align:center">2026 年 8 月</span>
+                  <button class="btn-ghost btn" style="padding:6px"><svg class="icon icon-sm"><use href="#i-chevron-right"/></svg></button>
+                </div>
+                <div class="cal-grid" id="calGrid"></div>
+                <div class="row" style="margin-top:14px;gap:14px;font-size:12px;color:var(--el-muted)">
+                  <span class="row" style="gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:var(--c-work)"></span>工作</span>
+                  <span class="row" style="gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:var(--c-knowledge)"></span>知识</span>
+                  <span class="row" style="gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:var(--c-health)"></span>健康</span>
+                  <span class="row" style="gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:var(--c-finance)"></span>财务</span>
+                  <span class="row" style="gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:var(--c-life)"></span>生活</span>
+                </div>
+              </div>
+              <div class="card">
+                <div class="section-title">8 月 11 日 · 今天</div>
+                <div class="timeline">
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-health)"></span>
+                    <div class="tl-body"><div class="tl-title">跑步 5.2 km</div><div class="tl-meta">07:12</div></div></div>
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-work)"></span>
+                    <div class="tl-body"><div class="tl-title">商单确认 · 品牌秋季推广</div><div class="tl-meta">10:30</div></div></div>
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-work)"></span>
+                    <div class="tl-body"><div class="tl-title">待办 · 回复客户邮件</div><div class="tl-meta">15:00 截止</div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========== 工作 · 本周 ========== -->
+        <section class="tab-panel" data-panel="work">
+          <div class="panel-inner">
+            <div class="page-head">
+              <div class="row" style="margin-bottom:8px">
+                <span class="dot" style="width:10px;height:10px;border-radius:50%;background:var(--c-work)"></span>
+                <span class="page-eyebrow" style="margin:0">工作 · 商务、内容</span>
+              </div>
+              <h1 class="page-title">本周</h1>
+            </div>
+            <div class="seg" style="margin-bottom:18px" data-subseg>
+              <button class="active" onclick="subSelect(this)">本周</button>
+              <button onclick="subSelect(this)">工作记录</button>
+              <button onclick="subSelect(this)">项目成果</button>
+              <button onclick="subSelect(this)">周期复盘</button>
+              <button onclick="subSelect(this)">职业档案</button>
+            </div>
+            <div class="grid grid-3" style="align-items:start">
+              <div class="card">
+                <div class="section-title">重点</div>
+                <div>
+                  <div class="li-row"><span class="chk"><svg class="icon icon-sm"><use href="#i-check"/></svg></span><span class="li-title">品牌秋季推广定稿</span></div>
+                  <div class="li-row"><span class="chk"></span><span class="li-title">内容选题会 · Q4 规划</span></div>
+                  <div class="li-row"><span class="chk"></span><span class="li-title">回复 3 封合作邮件</span></div>
+                  <div class="li-row done"><span class="chk"><svg class="icon icon-sm"><use href="#i-check"/></svg></span><span class="li-title">交付上期视频脚本</span></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="section-title">本周成果</div>
+                <div class="timeline">
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-work)"></span>
+                    <div class="tl-body"><div class="tl-title">商单确认</div><div class="tl-sub">¥8,800 · 已收定金</div></div></div>
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-work)"></span>
+                    <div class="tl-body"><div class="tl-title">视频脚本交付</div><div class="tl-sub">3 个选题 · 已过审</div></div></div>
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-work)"></span>
+                    <div class="tl-body"><div class="tl-title">粉丝 <span class="money"><span class="money__val">+1,240</span></span></div><div class="tl-sub">本周净增</div></div></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="section-title">待跟进</div>
+                <div class="timeline">
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--el-amber)"></span>
+                    <div class="tl-body"><div class="tl-title">某品牌尾款</div><div class="tl-sub">¥4,400 · 应收 8/15</div></div></div>
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--el-amber)"></span>
+                    <div class="tl-body"><div class="tl-title">合作方合同盖章</div><div class="tl-sub">已寄出 3 天</div></div></div>
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--el-muted)"></span>
+                    <div class="tl-body"><div class="tl-title">内容排期 9 月</div><div class="tl-sub">待规划</div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========== 知识 · 学习中 ========== -->
+        <section class="tab-panel" data-panel="knowledge">
+          <div class="panel-inner">
+            <div class="page-head">
+              <div class="row" style="margin-bottom:8px">
+                <span class="dot" style="width:10px;height:10px;border-radius:50%;background:var(--c-knowledge)"></span>
+                <span class="page-eyebrow" style="margin:0">知识 · 读书、课程</span>
+              </div>
+              <h1 class="page-title">学习中</h1>
+            </div>
+            <div class="seg" style="margin-bottom:18px" data-subseg>
+              <button class="active" onclick="subSelect(this)">学习中</button>
+              <button onclick="subSelect(this)">学习记录</button>
+              <button onclick="subSelect(this)">书籍</button>
+              <button onclick="subSelect(this)">课程与技能</button>
+              <button onclick="subSelect(this)">笔记与洞察</button>
+              <button onclick="subSelect(this)">学习复盘</button>
+            </div>
+            <div class="grid grid-2" style="align-items:start">
+              <div class="card">
+                <div class="section-title">当前资源</div>
+                <div class="stack">
+                  <div class="card" style="box-shadow:none;padding:14px;background:var(--el-bg)">
+                    <div class="row" style="margin-bottom:6px">
+                      <span class="avatar" style="width:32px;height:32px;background:var(--c-knowledge);border-radius:8px"><svg class="icon icon-sm"><use href="#i-book"/></svg></span>
+                      <span style="font-weight:600">思考，快与慢</span>
+                      <span class="badge b-producing" style="margin-left:auto"><span class="b-dot"></span>在读</span>
+                    </div>
+                    <div class="gl-row"><div class="gl-track"><div class="gl-fill" style="width:64%;background:var(--c-knowledge)"></div></div>
+                      <div class="gl-meta"><span>244 / 380 页</span><span>第 2 部</span></div></div>
+                  </div>
+                  <div class="card" style="box-shadow:none;padding:14px;background:var(--el-bg)">
+                    <div class="row" style="margin-bottom:6px">
+                      <span class="avatar" style="width:32px;height:32px;background:var(--c-knowledge);border-radius:8px"><svg class="icon icon-sm"><use href="#i-book"/></svg></span>
+                      <span style="font-weight:600">纳瓦尔宝典</span>
+                      <span class="badge b-producing" style="margin-left:auto"><span class="b-dot"></span>在读</span>
+                    </div>
+                    <div class="gl-row"><div class="gl-track"><div class="gl-fill" style="width:30%;background:var(--c-knowledge)"></div></div>
+                      <div class="gl-meta"><span>60 / 200 页</span><span>刚开始</span></div></div>
+                  </div>
+                  <div class="card" style="box-shadow:none;padding:14px;background:var(--el-bg)">
+                    <div class="row" style="margin-bottom:6px">
+                      <span class="avatar" style="width:32px;height:32px;background:var(--c-knowledge);border-radius:8px"><svg class="icon icon-sm"><use href="#i-graduation"/></svg></span>
+                      <span style="font-weight:600">视频剪辑进阶课</span>
+                      <span class="badge b-producing" style="margin-left:auto"><span class="b-dot"></span>进行中</span>
+                    </div>
+                    <div class="gl-row"><div class="gl-track"><div class="gl-fill" style="width:45%;background:var(--c-knowledge)"></div></div>
+                      <div class="gl-meta"><span>9 / 20 节</span><span>调色模块</span></div></div>
+                  </div>
+                </div>
+              </div>
+              <div class="stack">
+                <div class="card">
+                  <div class="section-title">本周计划</div>
+                  <div>
+                    <div class="li-row"><span class="chk"></span><span class="li-title">读完《思考，快与慢》第 2 部</span></div>
+                    <div class="li-row"><span class="chk"></span><span class="li-title">视频课：调色 3 节</span></div>
+                    <div class="li-row done"><span class="chk"><svg class="icon icon-sm"><use href="#i-check"/></svg></span><span class="li-title">整理上周读书笔记</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="section-title">最近记录</div>
+                  <div class="timeline">
+                    <div class="tl-item"><span class="tl-dot" style="background:var(--c-knowledge)"></span>
+                      <div class="tl-body"><div class="tl-title">读《思考，快与慢》28 页</div><div class="tl-meta">昨天 · 22:40</div></div></div>
+                    <div class="tl-item"><span class="tl-dot" style="background:var(--c-knowledge)"></span>
+                      <div class="tl-body"><div class="tl-title">笔记 · 锚定效应的三种表现</div><div class="tl-meta">前天</div></div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========== 健康 · 当前状态 ========== -->
+        <section class="tab-panel" data-panel="health">
+          <div class="panel-inner">
+            <div class="page-head">
+              <div class="row" style="margin-bottom:8px">
+                <span class="dot" style="width:10px;height:10px;border-radius:50%;background:var(--c-health)"></span>
+                <span class="page-eyebrow" style="margin:0">健康 · 运动、身体指标</span>
+              </div>
+              <h1 class="page-title">当前状态</h1>
+            </div>
+            <div class="seg" style="margin-bottom:18px" data-subseg>
+              <button class="active" onclick="subSelect(this)">当前状态</button>
+              <button onclick="subSelect(this)">运动</button>
+              <button onclick="subSelect(this)">身体指标</button>
+              <button onclick="subSelect(this)">健康记录</button>
+              <button onclick="subSelect(this)">健康档案</button>
+              <button onclick="subSelect(this)">健康复盘</button>
+            </div>
+            <div class="grid grid-3" style="align-items:start;margin-bottom:14px">
+              <div class="card">
+                <div class="kpi-label">体重</div>
+                <div class="kpi-val down">69.2 <span style="font-size:14px;color:var(--el-muted)">kg</span></div>
+                <svg class="spark" viewBox="0 0 200 40" preserveAspectRatio="none">
+                  <polyline fill="none" stroke="var(--c-health)" stroke-width="2" points="0,8 33,12 66,16 100,18 133,22 166,26 200,28"/>
+                  <circle cx="200" cy="28" r="3" fill="var(--c-health)"/>
+                </svg>
+                <div style="font-size:12px;color:var(--el-muted)">比起始 -3.8 kg · 8/9 读数</div>
+              </div>
+              <div class="card">
+                <div class="kpi-label">体脂率</div>
+                <div class="kpi-val down">18.5 <span style="font-size:14px;color:var(--el-muted)">%</span></div>
+                <svg class="spark" viewBox="0 0 200 40" preserveAspectRatio="none">
+                  <polyline fill="none" stroke="var(--c-health)" stroke-width="2" points="0,6 50,12 100,16 150,22 200,24"/>
+                  <circle cx="200" cy="24" r="3" fill="var(--c-health)"/>
+                </svg>
+                <div style="font-size:12px;color:var(--el-muted)">比上次 -0.6%</div>
+              </div>
+              <div class="card">
+                <div class="kpi-label">本周跑步</div>
+                <div class="kpi-val up">6.5 <span style="font-size:14px;color:var(--el-muted)">/ 10 km</span></div>
+                <div class="gl-row"><div class="gl-track"><div class="gl-fill" style="width:65%;background:var(--c-health)"></div></div></div>
+                <div style="font-size:12px;color:var(--el-muted)">本周目标 10 km · 还差 3.5</div>
+              </div>
+            </div>
+            <div class="grid grid-2" style="align-items:start">
+              <div class="card">
+                <div class="section-title">运动节奏</div>
+                <div class="timeline">
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-health)"></span>
+                    <div class="tl-body"><div class="tl-title">跑步 5.2 km · 38 min</div><div class="tl-sub">配速 7'18"</div><div class="tl-meta">今天 · 07:12</div></div></div>
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-health)"></span>
+                    <div class="tl-body"><div class="tl-title">跑步 1.3 km</div><div class="tl-sub">恢复跑</div><div class="tl-meta">8/8</div></div></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="section-title">待处理</div>
+                <div class="timeline">
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--el-amber)"></span>
+                    <div class="tl-body"><div class="tl-title">体重读数到期</div><div class="tl-sub">7 天未记录 · 上次 8/9</div></div></div>
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--el-muted)"></span>
+                    <div class="tl-body"><div class="tl-title">年度体检</div><div class="tl-sub">已预约 9/20</div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========== 财务 · 本月 ========== -->
+        <section class="tab-panel" data-panel="finance">
+          <div class="panel-inner">
+            <div class="page-head">
+              <div class="row" style="margin-bottom:8px">
+                <span class="dot" style="width:10px;height:10px;border-radius:50%;background:var(--c-finance)"></span>
+                <span class="page-eyebrow" style="margin:0">财务 · 现金流、投资</span>
+              </div>
+              <h1 class="page-title">本月 · 2026 年 8 月</h1>
+            </div>
+            <div class="seg" style="margin-bottom:18px" data-subseg>
+              <button class="active" onclick="subSelect(this)">本月</button>
+              <button onclick="subSelect(this)">收支流水</button>
+              <button onclick="subSelect(this)">资产负债</button>
+              <button onclick="subSelect(this)">投资</button>
+              <button onclick="subSelect(this)">预算</button>
+              <button onclick="subSelect(this)">财务复盘</button>
+            </div>
+            <div class="grid grid-3" style="align-items:start;margin-bottom:14px">
+              <div class="card">
+                <div class="kpi-label">本月收入</div>
+                <div class="kpi-val up money"><span class="money__val">¥18,600</span></div>
+                <div style="font-size:12px;color:var(--el-muted)">2 笔商单 + 广告分成</div>
+              </div>
+              <div class="card">
+                <div class="kpi-label">本月支出</div>
+                <div class="kpi-val down money"><span class="money__val">¥9,240</span></div>
+                <div style="font-size:12px;color:var(--el-muted)">日用 3,200 · 设备 4,100</div>
+              </div>
+              <div class="card">
+                <div class="kpi-label">本月结余</div>
+                <div class="kpi-val up money"><span class="money__val">¥9,360</span></div>
+                <div style="font-size:12px;color:var(--el-muted)">结余率 50%</div>
+              </div>
+            </div>
+            <div class="grid grid-2" style="align-items:start">
+              <div class="card">
+                <div class="section-title">净资产快照<span class="sec-sub">8/1 全账户</span></div>
+                <div class="kpi money"><span class="money__val" style="font-family:var(--font-disp);font-size:28px;font-weight:600;letter-spacing:-0.3px">¥184,500</span></div>
+                <svg class="spark" viewBox="0 0 200 40" preserveAspectRatio="none" style="height:48px;margin-top:6px">
+                  <polyline fill="none" stroke="var(--c-finance)" stroke-width="2" points="0,30 40,28 80,24 120,20 160,14 200,8"/>
+                  <circle cx="200" cy="8" r="3" fill="var(--c-finance)"/>
+                </svg>
+                <div style="font-size:12px;color:var(--el-muted)">比 7/1 +¥6,200 · 单一快照日，不跨日混算</div>
+              </div>
+              <div class="card">
+                <div class="section-title">最近流水</div>
+                <div class="timeline">
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-finance)"></span>
+                    <div class="tl-body"><div class="tl-title">收入 · 商单定金 <span class="money"><span class="money__val">+¥4,400</span></span></div><div class="tl-meta">今天 · 10:30</div></div></div>
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-finance)"></span>
+                    <div class="tl-body"><div class="tl-title">支出 · 超市 <span class="money"><span class="money__val">−¥186</span></span></div><div class="tl-meta">昨天</div></div></div>
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-finance)"></span>
+                    <div class="tl-body"><div class="tl-title">支出 · 储存卡 <span class="money"><span class="money__val">−¥1,200</span></span></div><div class="tl-meta">8/8</div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========== 生活 · 最近生活 ========== -->
+        <section class="tab-panel" data-panel="life">
+          <div class="panel-inner">
+            <div class="page-head">
+              <div class="row" style="margin-bottom:8px">
+                <span class="dot" style="width:10px;height:10px;border-radius:50%;background:var(--c-life)"></span>
+                <span class="page-eyebrow" style="margin:0">生活 · 旅行、娱乐、人际</span>
+              </div>
+              <h1 class="page-title">最近生活</h1>
+            </div>
+            <div class="seg" style="margin-bottom:18px" data-subseg>
+              <button class="active" onclick="subSelect(this)">最近生活</button>
+              <button onclick="subSelect(this)">愿望清单</button>
+              <button onclick="subSelect(this)">旅行</button>
+              <button onclick="subSelect(this)">体验</button>
+              <button onclick="subSelect(this)">重要的人</button>
+              <button onclick="subSelect(this)">生活复盘</button>
+            </div>
+            <div class="grid grid-3" style="align-items:start">
+              <div class="card">
+                <div class="section-title">近期安排</div>
+                <div class="timeline">
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-life)"></span>
+                    <div class="tl-body"><div class="tl-title">莫干山两天一夜</div><div class="tl-sub">和小林 · 已订民宿</div><div class="tl-meta">8/15 - 8/16</div></div></div>
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-life)"></span>
+                    <div class="tl-body"><div class="tl-title">看《奥本海默》重映</div><div class="tl-meta">8/13 · 周四</div></div></div>
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-life)"></span>
+                    <div class="tl-body"><div class="tl-title">妈妈生日</div><div class="tl-sub">每年 · 提前订蛋糕</div><div class="tl-meta">8/22</div></div></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="section-title">想做</div>
+                <div>
+                  <div class="li-row"><span class="chk"></span><span class="li-title">学冲浪</span></div>
+                  <div class="li-row"><span class="chk"></span><span class="li-title">去一趟京都</span></div>
+                  <div class="li-row"><span class="chk"></span><span class="li-title">组一台胶片相机</span></div>
+                  <div class="li-row done"><span class="chk"><svg class="icon icon-sm"><use href="#i-check"/></svg></span><span class="li-title">独自露营一次</span></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="section-title">最近体验</div>
+                <div class="timeline">
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-life)"></span>
+                    <div class="tl-body"><div class="tl-title">和小林吃晚饭</div><div class="tl-sub">值得重来 · 那家意面</div><div class="tl-meta">前天</div></div></div>
+                  <div class="tl-item"><span class="tl-dot" style="background:var(--c-life)"></span>
+                    <div class="tl-body"><div class="tl-title">独自骑行 30 km</div><div class="tl-sub">江边路线 · 爽</div><div class="tl-meta">8/7</div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========== 设置 ========== -->
+        <section class="tab-panel" data-panel="settings">
+          <div class="panel-inner">
+            <div class="page-head">
+              <div class="page-eyebrow">偏好与数据</div>
+              <h1 class="page-title">设置</h1>
+            </div>
+            <div class="stack" style="max-width:640px">
+              <div class="card">
+                <div class="section-title">板块模板</div>
+                <div class="setting-row">
+                  <span class="sr-icon avatar" style="background:var(--c-work);border-radius:8px;width:30px;height:30px"><svg class="icon icon-sm"><use href="#i-work"/></svg></span>
+                  <div class="sr-text"><div class="sr-title">商单管理</div><div class="sr-sub">看板 · 客户报价 · 阶段排期 · 应收关联</div></div>
+                  <label class="switch"><input type="checkbox"><span class="track"></span><span class="thumb"></span></label>
+                </div>
+                <div class="setting-row">
+                  <span class="sr-icon avatar" style="background:var(--c-work);border-radius:8px;width:30px;height:30px"><svg class="icon icon-sm"><use href="#i-work"/></svg></span>
+                  <div class="sr-text"><div class="sr-title">内容创作</div><div class="sr-sub">选题 · 制作 · 发布 · 表现 · 复盘</div></div>
+                  <label class="switch"><input type="checkbox" checked><span class="track"></span><span class="thumb"></span></label>
+                </div>
+              </div>
+              <div class="card">
+                <div class="section-title">偏好</div>
+                <div class="setting-row">
+                  <div class="sr-text"><div class="sr-title">隐藏金额</div><div class="sr-sub">界面中所有金额显示为 ••••（财务页试试）</div></div>
+                  <label class="switch"><input type="checkbox" id="hideMoney"><span class="track"></span><span class="thumb"></span></label>
+                </div>
+                <div class="setting-row">
+                  <div class="sr-text"><div class="sr-title">基础货币</div><div class="sr-sub">仅显示符号，不做汇率换算</div></div>
+                  <span class="badge b-planned">CNY ¥</span>
+                </div>
+              </div>
+              <div class="card">
+                <div class="section-title">本地数据</div>
+                <div class="setting-row">
+                  <div class="sr-text"><div class="sr-title">导出数据</div><div class="sr-sub">导出 JSON 备份（备份版本 11）</div></div>
+                  <button class="btn" onclick="toast('demo：不会真的导出文件')">导出 JSON</button>
+                </div>
+                <div class="setting-row">
+                  <div class="sr-text"><div class="sr-title">导入备份</div><div class="sr-sub">合并式导入，不会先清空</div></div>
+                  <button class="btn" onclick="toast('demo：不会真的导入')">导入 JSON</button>
+                </div>
+              </div>
+              <div class="danger-zone">
+                <div class="dz-title">危险区</div>
+                <div class="dz-sub">清空后无法恢复，请先导出备份。</div>
+                <button class="btn" style="border-color:var(--el-rose);color:var(--el-rose)" onclick="toast('demo：不会真的清空')">清空全部数据</button>
+              </div>
+              <div style="font-size:12px;color:var(--el-muted);text-align:center;padding:8px 0">
+                Life Board · 人生看板 · 单文件交互 demo · 数据均为静态演示
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- 侧栏 -->
+      <nav class="tabbar" aria-label="主导航">
+        <div class="side-brand">
+          <span class="side-logo">L</span>
+          <span class="side-brand-tw"><span class="side-brand-t">Life Board</span><span class="side-brand-sub">人生看板</span></span>
+          <button class="ref-sidebar-toggle" onclick="toggleSidebar()" title="折叠/展开 (⌘B)">
+            <svg class="icon icon-sm"><use href="#i-chevron-left"/></svg>
+          </button>
+        </div>
+        <button class="ref-sidebar-search" onclick="openSearch()">
+          <svg class="icon icon-sm"><use href="#i-search"/></svg>
+          <span class="ref-sidebar-label">搜索</span>
+          <kbd>⌘K</kbd>
+        </button>
+        <div class="side-nav-group side-nav-main">
+          <button class="tab active" data-tab="overview" onclick="switchTab('overview')">
+            <svg class="icon"><use href="#i-overview"/></svg><span class="tab-label">总览</span>
+          </button>
+          <button class="tab" data-tab="calendar" onclick="switchTab('calendar')">
+            <svg class="icon"><use href="#i-calendar"/></svg><span class="tab-label">日历</span>
+          </button>
+        </div>
+        <div class="side-sep">板块</div>
+        <div class="side-nav-group side-nav-areas">
+          <button class="tab" data-tab="work" onclick="switchTab('work')">
+            <svg class="icon"><use href="#i-work"/></svg><span class="dot" style="background:var(--c-work)"></span><span class="tab-label">工作</span>
+          </button>
+          <button class="tab" data-tab="knowledge" onclick="switchTab('knowledge')">
+            <svg class="icon"><use href="#i-knowledge"/></svg><span class="dot" style="background:var(--c-knowledge)"></span><span class="tab-label">知识</span>
+          </button>
+          <button class="tab" data-tab="health" onclick="switchTab('health')">
+            <svg class="icon"><use href="#i-health"/></svg><span class="dot" style="background:var(--c-health)"></span><span class="tab-label">健康</span>
+          </button>
+          <button class="tab" data-tab="finance" onclick="switchTab('finance')">
+            <svg class="icon"><use href="#i-finance"/></svg><span class="dot" style="background:var(--c-finance)"></span><span class="tab-label">财务</span>
+          </button>
+          <button class="tab" data-tab="life" onclick="switchTab('life')">
+            <svg class="icon"><use href="#i-life"/></svg><span class="dot" style="background:var(--c-life)"></span><span class="tab-label">生活</span>
+          </button>
+        </div>
+        <div class="side-foot">
+          <button class="side-cta" onclick="openRecord()">
+            <svg class="icon"><use href="#i-plus"/></svg><span>记录</span><kbd>⌘N</kbd>
+          </button>
+          <button class="side-profile" onclick="switchTab('settings')">
+            <span class="avatar">A</span><span class="pname">Alan · 设置</span>
+          </button>
+        </div>
+      </nav>
+    </div>
+
+    <!-- FAB -->
+    <button class="fab" id="fab" onclick="openRecord()" title="记录 (⌘N)">
+      <svg class="icon"><use href="#i-plus"/></svg>
+    </button>
+
+    <!-- ============ 记录浮层 ============ -->
+    <div class="overlay" id="recordOverlay" onclick="overlayClick(event,'recordOverlay')">
+      <div class="sheet" onclick="event.stopPropagation()">
+        <div class="sheet-head"><h3>记录</h3><button class="x" onclick="closeRecord()"><svg class="icon icon-sm"><use href="#i-x"/></svg></button></div>
+        <div class="sheet-body">
+          <div class="rec-types" id="recTypes">
+            <button class="rec-type active" data-type="log" onclick="recType(this)">
+              <span class="rt-icon"><svg class="icon icon-sm"><use href="#i-plus"/></svg></span>发生的事
+            </button>
+            <button class="rec-type" data-type="task" onclick="recType(this)">
+              <span class="rt-icon"><svg class="icon icon-sm"><use href="#i-check"/></svg></span>待办
+            </button>
+            <button class="rec-type" data-type="note" onclick="recType(this)">
+              <span class="rt-icon"><svg class="icon icon-sm"><use href="#i-book"/></svg></span>笔记
+            </button>
+            <button class="rec-type" data-type="reading" onclick="recType(this)">
+              <span class="rt-icon"><svg class="icon icon-sm"><use href="#i-health"/></svg></span>读数
+            </button>
+          </div>
+          <div class="field">
+            <label id="recMainLabel">一句话</label>
+            <input type="text" id="recMain" placeholder="今天发生了什么…" />
+          </div>
+          <div class="field" id="recValueField" style="display:none">
+            <label>读数数值</label>
+            <input type="number" id="recValue" placeholder="如 69.2" />
+          </div>
+          <div class="field" id="recNoteField" style="display:none">
+            <label>正文（Markdown）</label>
+            <textarea id="recNote" placeholder="写下你的笔记…"></textarea>
+          </div>
+          <div class="field-row">
+            <div class="field" style="margin:0">
+              <label>板块</label>
+              <select id="recArea">
+                <option value="work">工作</option><option value="knowledge">知识</option>
+                <option value="health">健康</option><option value="finance">财务</option>
+                <option value="life">生活</option>
+              </select>
+            </div>
+            <div class="field" style="margin:0">
+              <label>日期</label>
+              <input type="date" id="recDate" value="2026-08-11" />
+            </div>
+          </div>
+        </div>
+        <div class="sheet-foot">
+          <button class="btn btn-ghost" onclick="closeRecord()">取消</button>
+          <button class="btn" onclick="saveRecord(false)">保存继续</button>
+          <button class="btn btn-primary" onclick="saveRecord(true)">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 搜索浮层 ============ -->
+    <div class="overlay" id="searchOverlay" onclick="overlayClick(event,'searchOverlay')">
+      <div class="sheet" style="max-width:600px" onclick="event.stopPropagation()">
+        <div class="row" style="border-bottom:1px solid var(--el-line);padding:0">
+          <svg class="icon" style="margin-left:18px;color:var(--el-muted)"><use href="#i-search"/></svg>
+          <input type="text" class="search-input" id="searchInput" placeholder="搜索项目、任务、笔记、日志、钱…" />
+          <button class="x" style="margin-right:8px" onclick="closeSearch()"><svg class="icon icon-sm"><use href="#i-x"/></svg></button>
+        </div>
+        <div class="sheet-body" style="padding:0;max-height:50vh" id="searchResults">
+          <div class="search-group-title">项目</div>
+          <div class="search-item" data-q="品牌秋季推广 商单"><span class="tl-dot" style="background:var(--c-work);width:8px;height:8px;border-radius:50%;flex:none"></span><div><div class="si-title">品牌秋季推广</div><div class="si-sub">工作 · 商单 · 进行中</div></div></div>
+          <div class="search-group-title">任务</div>
+          <div class="search-item" data-q="回复客户邮件 待办"><span class="tl-dot" style="background:var(--c-work);width:8px;height:8px;border-radius:50%;flex:none"></span><div><div class="si-title">回复客户邮件</div><div class="si-sub">工作 · 今天 15:00 截止</div></div></div>
+          <div class="search-item" data-q="读完思考快与慢 读书"><span class="tl-dot" style="background:var(--c-knowledge);width:8px;height:8px;border-radius:50%;flex:none"></span><div><div class="si-title">读完《思考，快与慢》第 2 部</div><div class="si-sub">知识 · 本周计划</div></div></div>
+          <div class="search-group-title">笔记</div>
+          <div class="search-item" data-q="锚定效应 三种表现"><span class="tl-dot" style="background:var(--c-knowledge);width:8px;height:8px;border-radius:50%;flex:none"></span><div><div class="si-title">锚定效应的三种表现</div><div class="si-sub">知识 · 笔记 · 前天</div></div></div>
+          <div class="search-group-title">日志</div>
+          <div class="search-item" data-q="跑步 5.2km 运动"><span class="tl-dot" style="background:var(--c-health);width:8px;height:8px;border-radius:50%;flex:none"></span><div><div class="si-title">跑步 5.2 km</div><div class="si-sub">健康 · 今天 07:12</div></div></div>
+          <div class="search-group-title">钱</div>
+          <div class="search-item" data-q="超市采购 支出 186"><span class="tl-dot" style="background:var(--c-finance);width:8px;height:8px;border-radius:50%;flex:none"></span><div><div class="si-title">支出 · 超市采购 <span class="money"><span class="money__val">¥186</span></span></div><div class="si-sub">财务 · 昨天</div></div></div>
+          <div id="searchEmpty" style="display:none;padding:32px;text-align:center;color:var(--el-muted);font-size:13px">没有匹配的内容</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast-host"><div class="toast" id="toast"></div></div>
+
+    <script>
+      // ====== 面板切换 ======
+      const panels = document.querySelectorAll('.tab-panel');
+      const tabs = document.querySelectorAll('.tab[data-tab]');
+      const fab = document.getElementById('fab');
+      function switchTab(id) {
+        panels.forEach(p => p.classList.toggle('active', p.dataset.panel === id));
+        tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === id));
+        // FAB 在 设置/日历 隐藏（与源码一致）
+        fab.classList.toggle('hidden', id === 'settings' || id === 'calendar');
+        const c = document.querySelector('.content');
+        if (c) c.scrollTop = 0;
+      }
+
+      // ====== 子段切换（仅高亮，demo 不切内容）======
+      function subSelect(btn) {
+        const seg = btn.closest('[data-subseg]');
+        if (!seg) return;
+        seg.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        toast('demo 仅展示该板块默认页');
+      }
+
+      // ====== 侧栏折叠 ======
+      const app = document.getElementById('app');
+      function toggleSidebar() { app.classList.toggle('ref-sidebar-collapsed'); }
+
+      // ====== 浮层 ======
+      function openRecord() {
+        document.getElementById('recordOverlay').classList.add('open');
+        setTimeout(() => document.getElementById('recMain').focus(), 30);
+      }
+      function closeRecord() { document.getElementById('recordOverlay').classList.remove('open'); }
+      function openSearch() {
+        document.getElementById('searchOverlay').classList.add('open');
+        setTimeout(() => { const i = document.getElementById('searchInput'); i.focus(); i.select(); }, 30);
+      }
+      function closeSearch() { document.getElementById('searchOverlay').classList.remove('open'); }
+      function overlayClick(e, id) { if (e.target === e.currentTarget) document.getElementById(id).classList.remove('open'); }
+
+      // 记录类型切换
+      function recType(btn) {
+        document.querySelectorAll('#recTypes .rec-type').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const t = btn.dataset.type;
+        const val = document.getElementById('recValueField');
+        const note = document.getElementById('recNoteField');
+        const label = document.getElementById('recMainLabel');
+        const main = document.getElementById('recMain');
+        val.style.display = (t === 'reading') ? '' : 'none';
+        note.style.display = (t === 'note') ? '' : 'none';
+        label.textContent = { log: '一句话', task: '待办内容', note: '标题', reading: '指标' }[t];
+        main.placeholder = { log: '今天发生了什么…', task: '要做什么…', note: '给笔记起个标题', reading: '如 体重 / 体脂' }[t];
+      }
+      function saveRecord(close) {
+        toast('已记录（demo 不保存数据）');
+        if (close) closeRecord();
+        else { document.getElementById('recMain').value = ''; document.getElementById('recMain').focus(); }
+      }
+
+      // 搜索过滤
+      const searchInput = document.getElementById('searchInput');
+      searchInput.addEventListener('input', () => {
+        const q = searchInput.value.trim().toLowerCase();
+        let anyVisible = false;
+        document.querySelectorAll('#searchResults .search-item').forEach(it => {
+          const hay = (it.dataset.q + ' ' + it.textContent).toLowerCase();
+          const show = !q || hay.includes(q);
+          it.style.display = show ? '' : 'none';
+          if (show) anyVisible = true;
+        });
+        document.querySelectorAll('#searchResults .search-group-title').forEach(g => {
+          let nxt = g.nextElementSibling; let has = false;
+          while (nxt && !nxt.classList.contains('search-group-title')) {
+            if (nxt.classList.contains('search-item') && nxt.style.display !== 'none') has = true;
+            nxt = nxt.nextElementSibling;
+          }
+          g.style.display = has ? '' : 'none';
+        });
+        document.getElementById('searchEmpty').style.display = anyVisible ? 'none' : '';
+      });
+
+      // 隐藏金额
+      document.getElementById('hideMoney').addEventListener('change', e => {
+        document.body.classList.toggle('hide-money', e.target.checked);
+        if (e.target.checked) { switchTab('finance'); toast('金额已隐藏，看财务页'); }
+      });
+
+      // ====== Toast ======
+      let toastTimer;
+      function toast(msg) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+      }
+
+      // ====== 日历生成（2026-08，11 号为今天）======
+      (function buildCalendar() {
+        const grid = document.getElementById('calGrid');
+        if (!grid) return;
+        const dows = ['一', '二', '三', '四', '五', '六', '日'];
+        dows.forEach(d => { const e = document.createElement('div'); e.className = 'cal-dow'; e.textContent = d; grid.appendChild(e); });
+        // 2026-08-01 是周六 → 周一为起点的网格：前 5 个占位（一~五），8/1 落在"六"
+        // 实际：2026/8/1 = 周六。周一开头需补 5 个 dim
+        const lead = 5;
+        for (let i = 0; i < lead; i++) { const c = document.createElement('div'); c.className = 'cal-cell dim'; grid.appendChild(c); }
+        const dots = {
+          5: ['var(--c-work)'], 7: ['var(--c-health)'], 8: ['var(--c-finance)'], 9: ['var(--c-health)'],
+          11: ['var(--c-health)', 'var(--c-work)'],
+          13: ['var(--c-life)'], 15: ['var(--c-life)'], 22: ['var(--c-life)']
+        };
+        for (let d = 1; d <= 31; d++) {
+          const c = document.createElement('div');
+          c.className = 'cal-cell' + (d === 11 ? ' today' : '');
+          c.innerHTML = '<span>' + d + '</span>';
+          if (dots[d]) {
+            const wrap = document.createElement('div'); wrap.className = 'cal-dots';
+            dots[d].forEach(col => { const s = document.createElement('span'); s.style.background = col; wrap.appendChild(s); });
+            c.appendChild(wrap);
+          }
+          grid.appendChild(c);
+        }
+      })();
+
+      // ====== 快捷键 ======
+      document.addEventListener('keydown', (e) => {
+        const meta = e.metaKey || e.ctrlKey;
+        const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+        const anyOverlayOpen = !!document.querySelector('.overlay.open');
+
+        if (e.key === 'Escape') {
+          document.querySelectorAll('.overlay.open').forEach(o => o.classList.remove('open'));
+          return;
+        }
+        if (meta && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); return; }
+        if (meta && e.key.toLowerCase() === 'n') { e.preventDefault(); openRecord(); return; }
+        if (meta && e.key.toLowerCase() === 'b') { e.preventDefault(); toggleSidebar(); return; }
+        if (meta && e.key === '1') { e.preventDefault(); switchTab('overview'); return; }
+        // 裸键：仅在未输入且无浮层时
+        if (!typing && !anyOverlayOpen) {
+          if (e.key === '/' ) { e.preventDefault(); openSearch(); return; }
+          if (e.key.toLowerCase() === 'n') { e.preventDefault(); openRecord(); return; }
+        }
+      });
+
+      document.getElementById('topbarSearchBtn').addEventListener('click', openSearch);
+    </script>
+  </body>
+</html>
